@@ -1,88 +1,137 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Custom Block Editor</title>
-        <script src="https://salesforce-marketingcloud.github.io/blocksdk/dist/blocksdk.min.js"></script>
-  </head>
-  <body>
-    <h1>Custom Message Editor</h1>
-    <input
-      type="text"
-      id="customMessage"
-      placeholder="Enter your custom message"
-    />
-    <button id="saveButton">Save Content</button>
+<head>
+    <title>Bynder Asset Selector</title>
+   
+    
+    <!-- 1. Include the Bynder Universal Compact View (UCV) Loader Script -->
+    <!-- This script provides the global 'BynderCompactView' object -->
+    <script async src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-5-latest.js"></script>
 
-    <script>
-        // 🔑 FIX A: Ensure initialization runs AFTER the DOM and SDK are loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            
-            // 1. Initialize the SDK (will now be defined)
-            var sdk = new window.sfdc.BlockSDK();
-            
-            // Helper function to safely extract the JSON from the saved HTML
-            function getConfigFromHtml(html) {
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
-                const configElement = tempDiv.querySelector('[data-json-config]');
-                
-                if (configElement) {
-                    const jsonString = configElement.getAttribute('data-json-config').replace(/&quot;/g, '"');
-                    try {
-                        return JSON.parse(jsonString);
-                    } catch (e) {
-                        console.error('Error parsing JSON from saved content:', e);
-                        return null;
-                    }
-                }
-                return null;
+    <style>
+        body { font-family: 'Inter', sans-serif; padding: 20px; background-color: #f7f7f7; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #bynder-btn {
+            background-color: #00A9E0; /* Bynder Blue */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        #bynder-btn:hover { background-color: #008cc9; }
+        .asset-info { margin-top: 20px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px; }
+        .asset-info p { margin: 5px 0; font-size: 0.9em; }
+        .asset-info strong { color: #333; }
+        .placeholder { color: #999; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h3>Bynder Asset Selector</h3>
+        <p>Click the button below to browse and select your desired image from the Bynder DAM.</p>
+        
+        <button id="bynder-btn">Browse Bynder</button>
+        
+        <div class="asset-info">
+            <p><strong>Selected Image:</strong> <span id="asset-name-display" class="placeholder">No asset selected.</span></p>
+            <p><strong>Asset ID:</strong> <span id="asset-id-display" class="placeholder">N/A</span></p>
+            <p><strong>Alt Text (Fallback):</strong> <span id="alt-text-display" class="placeholder">N/A</span></p>
+        </div>
+    </div>
+
+    <script>
+        // --- 2. Bynder Configuration (MUST BE UPDATED) ---
+        // Replace with your actual Bynder Portal URL (without trailing slash)
+        const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
+        
+        // IMPORTANT: Identify the metaproperty name/ID for Alt Text in your Bynder setup
+        // Common placeholders: 'alt_text', 'description', or a UUID
+        const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
+
+        // --- 3. UCV Launch and Data Handling ---
+
+        document.getElementById('bynder-btn').addEventListener('click', function() {
+            // Check if the BynderCompactView is loaded
+            if (typeof BynderCompactView === 'undefined') {
+                alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
+                return;
             }
-
-            // 2. Define the saveContent function
-            function saveContent() {
-                var message = document.getElementById("customMessage").value;
+            
+            BynderCompactView.open({
+                language: "en_US",
+                theme: {
+          colorButtonPrimary: "#3380FF"
+        },
+           
+                mode: "SingleSelectFile",
                 
-                var config = { messageText: message };
-                // Escape quotes for HTML attribute safety
-                var jsonString = JSON.stringify(config).replace(/"/g, '&quot;');
-                
-                var renderedContent = 
-                    // Invisible div to store the JSON config
-                    '<div data-json-config="' + jsonString + '" style="display:none;"></div>' +
-                    
-                    // AMPscript to read the config and use it at send time
-                    '%%[ ' +
-                    'VAR @configJson, @json, @message ' +
-                    'SET @configJson = AttributeValue("data-json-config") ' +
-                    'SET @json = BuildRowsetFromJson(@configJson, "$", 1) ' +
-                    'SET @message = Field(Row(@json, 1), "messageText") ' +
-                    ']%%' +
-                    
-                    // Visible email HTML using the extracted message
-                    '<p style="color: blue;">Your custom message: %%=v(@message)=%%</p>';
-                    
-                sdk.setContent(renderedContent, function () {
-                    console.log("Content successfully saved!");
-                });
-            }
+                // The function that runs when the user selects an asset
+                onSuccess: function(assets, additionalInfo) {
 
-            // 3. LOAD existing content when the editor opens
-            sdk.getContent(function (content) {
-                if (content) {
-                    const config = getConfigFromHtml(content);
+       var asset = assets[0];
 
-                    if (config && config.messageText) {
-                        document.getElementById("customMessage").value = config.messageText;
-                    } else {
-                        console.warn('Content found, but no valid JSON configuration was extracted.');
+          console.log(asset, additionalInfo);
+                    if (assets && assets.length > 0) {
+console.log('Handle asset called.');
+
+                        handleAssetSelection(asset);
                     }
+                },
+                
+                // Optional: Handle when the user closes the UCV without selecting
+                onClose: function() {
+                    console.log('Bynder UCV closed.');
                 }
             });
+        });
 
-            // 4. Attach the Event Listener
-            document.getElementById("saveButton").addEventListener("click", saveContent);
-        }); // End of DOMContentLoaded
-    </script>
-  </body>
+
+        /**
+         * Processes the data returned from the Bynder UCV and sends it to SFMC Content Builder.
+         * @param {Object} asset - The single asset object returned by Bynder.
+         */
+        function handleAssetSelection(asset) {
+            
+            const assetID = asset.id;
+            const imageURL = asset.url; // The main public image URL
+            
+            // Attempt to pull the Alt Text from the specific metaproperty
+            let altText = asset.name || "Default Image Alt Text"; // Fallback to asset name
+            
+            // Check the metaproperties for the specific alt text field
+            if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
+                // Assuming it's a single value (can be an array for multi-select)
+                const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
+                altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
+            }
+
+            // Update the UI for the marketer
+            document.getElementById('asset-name-display').textContent = asset.name;
+            document.getElementById('asset-id-display').textContent = assetID;
+            document.getElementById('alt-text-display').textContent = altText;
+            document.getElementById('alt-text-display').classList.remove('placeholder');
+
+            // --- SFMC Content Block SDK Function ---
+            // Pass the data that will be used as placeholders in view.html
+            const viewData = {
+                // These keys MUST match the placeholders (e.g., {{assetID}}) in your view.html
+                assetID: assetID, 
+                imageURL: imageURL, 
+                // We pass the captured Alt Text as a fallback value for display
+                altTextFallback: altText 
+            };
+
+            // This function tells Content Builder to update the final HTML (view.html)
+            // It replaces the placeholders in view.html with the data values above.
+            if (typeof sfmc !== 'undefined' && sfmc.postData) {
+                 sfmc.postData(viewData); 
+            } else {
+                console.error("SFMC SDK not available. Could not post data.");
+            }
+        }
+    </script>
+</body>
 </html>
-
