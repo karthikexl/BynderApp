@@ -3,12 +3,28 @@
 <head>
     <title>Bynder Asset Selector</title>
     
-    <script src="https://salesforce-marketingcloud.github.io/blocksdk/dist/blocksdk.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/blocksdk@1.3.0/blocksdk.js"></script>
     
     <script async src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-5-latest.js"></script>
 
     <style>
-        /* ... (Your existing CSS here) ... */
+        body { font-family: 'Inter', sans-serif; padding: 20px; background-color: #f7f7f7; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #bynder-btn {
+            background-color: #00A9E0; /* Bynder Blue */
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        #bynder-btn:hover { background-color: #008cc9; }
+        .asset-info { margin-top: 20px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px; }
+        .asset-info p { margin: 5px 0; font-size: 0.9em; }
+        .asset-info strong { color: #333; }
+        .placeholder { color: #999; }
     </style>
 </head>
 <body>
@@ -26,24 +42,26 @@
     </div>
 
     <script>
-        // 🚨 IMPORTANT: REPLACE THESE PLACEHOLDERS 🚨
-        const BLOCK_EXTERNAL_KEY = 'YOUR_BLOCK_EXTERNAL_KEY_HERE'; 
-        const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
-        const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
-        
-        var sdk;
-        
+        // 🔑 FIX 2: Use window.onload to ensure ALL external scripts (SFMC & Bynder) have run.
         window.onload = function() {
+            
+            // --- 0. Initialize SFMC SDK ---
+            var sdk;
             try {
                 sdk = new window.sfdc.BlockSDK();
                 console.log("SFMC BlockSDK initialized successfully.");
             } catch(e) {
-                console.error("CRITICAL ERROR: SDK initialization failed.", e);
+                console.error("CRITICAL ERROR: window.sfdc or BlockSDK is undefined. The SDK script file is likely being blocked from loading.", e);
                 document.getElementById('bynder-btn').disabled = true;
-                return;
+                return; // Stop execution if SDK is not ready
             }
 
-            // --- 1. Event Listener for Bynder Button ---
+            // --- 2. Bynder Configuration (MUST BE UPDATED) ---
+            const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
+            const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
+
+            // --- 3. UCV Launch and Data Handling ---
+
             document.getElementById('bynder-btn').addEventListener('click', function() {
                 if (typeof BynderCompactView === 'undefined') {
                     alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
@@ -52,125 +70,103 @@
                 
                 BynderCompactView.open({
                     language: "en_US",
-                    theme: { colorButtonPrimary: "#3380FF" },
+                    theme: {
+                        colorButtonPrimary: "#3380FF"
+                    },
                     mode: "SingleSelectFile",
+                    
                     onSuccess: function(assets, additionalInfo) {
                         if (assets && assets.length > 0) {
                             handleAssetSelection(assets[0]);
                         }
                     },
-                    onClose: function() { console.log('Bynder UCV closed.'); }
+                    
+                    onClose: function() {
+                        console.log('Bynder UCV closed.');
+                    }
                 });
             });
 
 
-            // --- 2. Load Existing Data on Editor Open ---
+            /**
+             * Processes the data returned from the Bynder UCV and saves it to SFMC.
+             */
+            function handleAssetSelection(asset) {
+                
+                const assetID = asset.id;
+                // NOTE: Use Bynder's derivative URL here for responsive sizing in production
+                const imageURL = asset.url; 
+                let altText = asset.name || "Image"; 
+                
+                if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
+                    const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
+                    altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
+                }
+
+                // --- 1. CONFIGURATION DATA (for the editor to reload) ---
+                const editorConfig = {
+                    assetID: assetID,
+                    imageURL: imageURL,
+                    altText: altText,
+                    assetName: asset.name // Save for cleaner display
+                };
+                  console.log("Handle initialized successfully.");
+
+                // --- 2. SFMC CONTENT SAVE FUNCTION ---
+                
+                // CRITICAL: Ensure image has proper email styling for responsiveness
+                const finalImageHTML = `
+                    <img src="${imageURL}" 
+                         alt="${altText}" 
+                         width="600" 
+                         style="display:block; max-width:100%; height:auto;" 
+                         border="0" />
+                    `;
+
+                if (sdk) {
+                      console.log("SFMC BlockSDK Set content successfully.");
+                    // 2a. Save the final HTML for email rendering
+                    sdk.setContent(finalImageHTML, function() {
+                        console.log("Image HTML saved to block content.");
+                    });
+                    
+                    // 2b. Save the clean JSON data for the editor to use later
+                    sdk.setData(editorConfig, function() {
+                        console.log("Configuration JSON saved via sdk.setData().");
+                        
+                        // Update the UI *after* successful saves
+                        updateEditorDisplay(editorConfig);
+                    });
+                }
+            }
+
+            /**
+             * Updates the editor's UI fields with the latest data.
+             */
+            function updateEditorDisplay(data) {
+                document.getElementById('asset-name-display').textContent = data.assetName || data.assetID;
+                document.getElementById('asset-id-display').textContent = data.assetID;
+                document.getElementById('alt-text-display').textContent = data.altText;
+                
+                document.getElementById('asset-name-display').classList.remove('placeholder');
+                document.getElementById('asset-id-display').classList.remove('placeholder');
+                document.getElementById('alt-text-display').classList.remove('placeholder');
+            }
+
+
+            // --- 4. LOAD existing configuration when the editor opens ---
             if (sdk) {
                 sdk.getData(function (data) {
                     if (data && data.assetID) {
                         console.log("Existing configuration loaded:", data);
+                        // Populate the display fields with saved data
                         updateEditorDisplay(data);
                     } else {
                         console.log("No previous configuration data found. Starting fresh.");
                     }
                 });
             }
-        }; 
-
-        /**
-         * Saves data via sdk.setData() and SSJS/AMPscript via sdk.setContent().
-         */
-        function handleAssetSelection(asset) {
-            
-            const assetID = asset.id;
-            const imageURL = asset.url; 
-            let altText = asset.name || "Image"; 
-            
-            if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
-                const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
-                altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
-            }
-
-            // --- A. CONFIGURATION DATA (for the editor to reload) ---
-            const editorConfig = {
-                assetID: assetID,
-                imageURL: imageURL,
-                altText: altText,
-                assetName: asset.name 
-            };
-
-            // --- B. SERVER-SIDE RENDERING CONTENT (SSJS/AMPscript) ---
-            // This is the string that gets saved to the email content block
-            const finalSSJSHtml = `
-%%[
-/* 1. Define AMPscript variables */
-VAR @imageURL, @altText, @jsonString
-]%%
-<script runat="server">
-    Platform.Load("core", "1.1.1");
-    
-    // 2. Retrieve the JSON configuration saved by sdk.setData()
-    try {
-        var blockData = ContentBlockById('${BLOCK_EXTERNAL_KEY}').ContentBlockData;
-        var jsonString = blockData.data; 
-    } catch(e) {
-        var jsonString = null;
-        Variable.SetValue("@error", "Data retrieval failed: " + e.message);
-    }
-
-    if (jsonString) {
-        // 3. Parse the JSON string and transfer to AMPscript
-        var data = Platform.Function.ParseJSON(jsonString);
-
-        Platform.Variable.SetValue("@imageURL", data.imageURL);
-        Platform.Variable.SetValue("@altText", data.altText);
-    }
-</script>
-%%[
-/* 4. AMPscript for Conditional Rendering */
-IF NOT EMPTY(@imageURL) THEN
-]%%
-<p style="margin: 0; padding: 0; line-height: 0;">
-    <img src="%%=v(@imageURL)=%%" 
-         alt="%%=v(@altText)=%%" 
-         width="600" 
-         style="display:block; max-width:100%; height:auto;" 
-         border="0">
-</p>
-%%[
-ELSE
-]%%
-%%[
-ENDIF
-]%%
-    `;
-
-            if (sdk) {
-                // 5. Save the Server-Side Rendering code block
-                sdk.setContent(finalSSJSHtml, function() {
-                    console.log("SSJS/AMPscript saved for SSR.");
-                });
-                
-                // 6. Save the clean JSON data for the editor to use later
-                sdk.setData(editorConfig, function() {
-                    console.log("Configuration JSON saved via sdk.setData().");
-                    updateEditorDisplay(editorConfig);
-                });
-            }
-        }
-
-        /**
-         * Updates the editor's UI fields with the latest data.
-         */
-        function updateEditorDisplay(data) {
-            document.getElementById('asset-name-display').textContent = data.assetName || data.assetID;
-            document.getElementById('asset-id-display').textContent = data.assetID;
-            document.getElementById('alt-text-display').textContent = data.altText;
-            
-            document.getElementById('asset-name-display').classList.remove('placeholder');
-            document.getElementById('asset-id-display').classList.remove('placeholder');
-            document.getElementById('alt-text-display').classList.remove('placeholder');
-        }
+        }; // End of window.onload
     </script>
 </body>
 </html>
