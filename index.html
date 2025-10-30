@@ -110,34 +110,64 @@
                     altText: altText,
                     assetName: asset.name // Save for cleaner display
                 };
-                  console.log("Handle initialized successfully.");
+                  console.log("SFMC BlockSDK initialized successfully.");
 
                 // --- 2. SFMC CONTENT SAVE FUNCTION ---
                 
                 // CRITICAL: Ensure image has proper email styling for responsiveness
-                const finalImageHTML = `
-                    <img src="${imageURL}" 
-                         alt="${altText}" 
-                         width="600" 
-                         style="display:block; max-width:100%; height:auto;" 
-                         border="0" />
-                    `;
+              // Inside your handleAssetSelection function:
+const finalImageHTML = `
+%%[
+/* 1. Define AMPscript variables */
+VAR @imageURL, @altText, @jsonString
+]%%
+<script runat="server">
+    Platform.Load("core", "1.1.1");
+    
+    // 2. Retrieve the JSON configuration saved by sdk.setData()
+    try {
+        var blockData = ContentBlockById('YOUR_BLOCK_EXTERNAL_KEY_HERE').ContentBlockData;
+        var jsonString = blockData.data; 
+    } catch(e) {
+        var jsonString = null;
+        Variable.SetValue("@error", "Retrieval failed.");
+    }
 
-                if (sdk) {
-                      console.log("SFMC BlockSDK Set content successfully.");
-                    // 2a. Save the final HTML for email rendering
-                    sdk.setContent(finalImageHTML, function() {
-                        console.log("Image HTML saved to block content.");
-                    });
-                    
-                    // 2b. Save the clean JSON data for the editor to use later
-                    sdk.setData(editorConfig, function() {
-                        console.log("Configuration JSON saved via sdk.setData().");
-                        
-                        // Update the UI *after* successful saves
-                        updateEditorDisplay(editorConfig);
-                    });
-                }
+    if (jsonString) {
+        // 3. Parse the JSON string and transfer to AMPscript
+        try {
+            var data = Platform.Function.ParseJSON(jsonString);
+
+            Platform.Variable.SetValue("@imageURL", data.imageURL);
+            Platform.Variable.SetValue("@altText", data.altText);
+        } catch(e) {
+            Variable.SetValue("@error", "JSON Parse failed.");
+        }
+    }
+</script>
+%%[
+/* 4. AMPscript for Conditional Rendering */
+IF NOT EMPTY(@imageURL) THEN
+]%%
+<p style="margin: 0; padding: 0; line-height: 0;">
+    <img src="%%=v(@imageURL)=%%" 
+         alt="%%=v(@altText)=%%" 
+         width="600" 
+         style="display:block; max-width:100%; height:auto;" 
+         border="0">
+</p>
+%%[
+ELSE
+]%%
+%%[
+ENDIF
+]%%
+`; // End of finalImageHTML string (Use backticks)
+
+// And ensure you are saving it with:
+sdk.setContent(finalImageHTML, function() {
+    console.log("SSR content saved.");
+});
             }
 
             /**
