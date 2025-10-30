@@ -2,10 +2,9 @@
 <html>
 <head>
     <title>Bynder Asset Selector</title>
-   
     
-    <!-- 1. Include the Bynder Universal Compact View (UCV) Loader Script -->
-    <!-- This script provides the global 'BynderCompactView' object -->
+    <script src="https://cdn.jsdelivr.net/npm/blocksdk@1.3.0/blocksdk.js"></script>
+    
     <script async src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-5-latest.js"></script>
 
     <style>
@@ -38,100 +37,134 @@
         <div class="asset-info">
             <p><strong>Selected Image:</strong> <span id="asset-name-display" class="placeholder">No asset selected.</span></p>
             <p><strong>Asset ID:</strong> <span id="asset-id-display" class="placeholder">N/A</span></p>
-            <p><strong>Alt Text (Fallback):</strong> <span id="alt-text-display" class="placeholder">N/A</span></p>
+            <p><strong>Alt Text:</strong> <span id="alt-text-display" class="placeholder">N/A</span></p>
         </div>
     </div>
 
     <script>
-        // --- 2. Bynder Configuration (MUST BE UPDATED) ---
-        // Replace with your actual Bynder Portal URL (without trailing slash)
-        const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
-        
-        // IMPORTANT: Identify the metaproperty name/ID for Alt Text in your Bynder setup
-        // Common placeholders: 'alt_text', 'description', or a UUID
-        const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
-
-        // --- 3. UCV Launch and Data Handling ---
-
-        document.getElementById('bynder-btn').addEventListener('click', function() {
-            // Check if the BynderCompactView is loaded
-            if (typeof BynderCompactView === 'undefined') {
-                alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
-                return;
-            }
+        // 🔑 FIX 2: Use window.onload to ensure ALL external scripts (SFMC & Bynder) have run.
+        window.onload = function() {
             
-            BynderCompactView.open({
-                language: "en_US",
-                theme: {
-          colorButtonPrimary: "#3380FF"
-        },
-           
-                mode: "SingleSelectFile",
-                
-                // The function that runs when the user selects an asset
-                onSuccess: function(assets, additionalInfo) {
+            // --- 0. Initialize SFMC SDK ---
+            var sdk;
+            try {
+                sdk = new window.sfdc.BlockSDK();
+                console.log("SFMC BlockSDK initialized successfully.");
+            } catch(e) {
+                console.error("CRITICAL ERROR: window.sfdc or BlockSDK is undefined. The SDK script file is likely being blocked from loading.", e);
+                document.getElementById('bynder-btn').disabled = true;
+                return; // Stop execution if SDK is not ready
+            }
 
-       var asset = assets[0];
+            // --- 2. Bynder Configuration (MUST BE UPDATED) ---
+            const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
+            const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
 
-          console.log(asset, additionalInfo);
-                    if (assets && assets.length > 0) {
-console.log('Handle asset called.');
+            // --- 3. UCV Launch and Data Handling ---
 
-                        handleAssetSelection(asset);
-                    }
-                },
-                
-                // Optional: Handle when the user closes the UCV without selecting
-                onClose: function() {
-                    console.log('Bynder UCV closed.');
+            document.getElementById('bynder-btn').addEventListener('click', function() {
+                if (typeof BynderCompactView === 'undefined') {
+                    alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
+                    return;
                 }
+                
+                BynderCompactView.open({
+                    language: "en_US",
+                    theme: {
+                        colorButtonPrimary: "#3380FF"
+                    },
+                    mode: "SingleSelectFile",
+                    
+                    onSuccess: function(assets, additionalInfo) {
+                        if (assets && assets.length > 0) {
+                            handleAssetSelection(assets[0]);
+                        }
+                    },
+                    
+                    onClose: function() {
+                        console.log('Bynder UCV closed.');
+                    }
+                });
             });
-        });
 
 
-        /**
-         * Processes the data returned from the Bynder UCV and sends it to SFMC Content Builder.
-         * @param {Object} asset - The single asset object returned by Bynder.
-         */
-        function handleAssetSelection(asset) {
-            
-            const assetID = asset.id;
-            const imageURL = asset.url; // The main public image URL
-            
-            // Attempt to pull the Alt Text from the specific metaproperty
-            let altText = asset.name || "Default Image Alt Text"; // Fallback to asset name
-            
-            // Check the metaproperties for the specific alt text field
-            if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
-                // Assuming it's a single value (can be an array for multi-select)
-                const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
-                altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
+            /**
+             * Processes the data returned from the Bynder UCV and saves it to SFMC.
+             */
+            function handleAssetSelection(asset) {
+                
+                const assetID = asset.id;
+                // NOTE: Use Bynder's derivative URL here for responsive sizing in production
+                const imageURL = asset.url; 
+                let altText = asset.name || "Image"; 
+                
+                if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
+                    const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
+                    altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
+                }
+
+                // --- 1. CONFIGURATION DATA (for the editor to reload) ---
+                const editorConfig = {
+                    assetID: assetID,
+                    imageURL: imageURL,
+                    altText: altText,
+                    assetName: asset.name // Save for cleaner display
+                };
+
+                // --- 2. SFMC CONTENT SAVE FUNCTION ---
+                
+                // CRITICAL: Ensure image has proper email styling for responsiveness
+                const finalImageHTML = `
+                    <img src="${imageURL}" 
+                         alt="${altText}" 
+                         width="600" 
+                         style="display:block; max-width:100%; height:auto;" 
+                         border="0" />
+                    `;
+
+                if (sdk) {
+                    // 2a. Save the final HTML for email rendering
+                    sdk.setContent(finalImageHTML, function() {
+                        console.log("Image HTML saved to block content.");
+                    });
+                    
+                    // 2b. Save the clean JSON data for the editor to use later
+                    sdk.setData(editorConfig, function() {
+                        console.log("Configuration JSON saved via sdk.setData().");
+                        
+                        // Update the UI *after* successful saves
+                        updateEditorDisplay(editorConfig);
+                    });
+                }
             }
 
-            // Update the UI for the marketer
-            document.getElementById('asset-name-display').textContent = asset.name;
-            document.getElementById('asset-id-display').textContent = assetID;
-            document.getElementById('alt-text-display').textContent = altText;
-            document.getElementById('alt-text-display').classList.remove('placeholder');
-
-            // --- SFMC Content Block SDK Function ---
-            // Pass the data that will be used as placeholders in view.html
-            const viewData = {
-                // These keys MUST match the placeholders (e.g., {{assetID}}) in your view.html
-                assetID: assetID, 
-                imageURL: imageURL, 
-                // We pass the captured Alt Text as a fallback value for display
-                altTextFallback: altText 
-            };
-
-            // This function tells Content Builder to update the final HTML (view.html)
-            // It replaces the placeholders in view.html with the data values above.
-            if (typeof sfmc !== 'undefined' && sfmc.postData) {
-                 sfmc.postData(viewData); 
-            } else {
-                console.error("SFMC SDK not available. Could not post data.");
+            /**
+             * Updates the editor's UI fields with the latest data.
+             */
+            function updateEditorDisplay(data) {
+                document.getElementById('asset-name-display').textContent = data.assetName || data.assetID;
+                document.getElementById('asset-id-display').textContent = data.assetID;
+                document.getElementById('alt-text-display').textContent = data.altText;
+                
+                document.getElementById('asset-name-display').classList.remove('placeholder');
+                document.getElementById('asset-id-display').classList.remove('placeholder');
+                document.getElementById('alt-text-display').classList.remove('placeholder');
             }
-        }
+
+
+            // --- 4. LOAD existing configuration when the editor opens ---
+            if (sdk) {
+                sdk.getData(function (data) {
+                    if (data && data.assetID) {
+                        console.log("Existing configuration loaded:", data);
+                        // Populate the display fields with saved data
+                        updateEditorDisplay(data);
+                    } else {
+                        console.log("No previous configuration data found. Starting fresh.");
+                    }
+                });
+            }
+        }; // End of window.onload
     </script>
 </body>
 </html>
