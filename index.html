@@ -16,55 +16,60 @@
     <script>
       // 1. Initialize the SDK
       var sdk = new window.sfdc.BlockSDK();
-      
-      // Helper function to safely extract the JSON from the saved HTML
-      function getConfigFromHtml(html) {
-          // Use a temporary div to parse the HTML string
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = html;
-          
-          // Look for the element with the JSON config data-attribute
-          const configElement = tempDiv.querySelector('[data-json-config]');
-          
-          if (configElement) {
-              const jsonString = configElement.getAttribute('data-json-config');
-              try {
-                  return JSON.parse(jsonString);
-              } catch (e) {
-                  console.error('Error parsing JSON from saved content:', e);
-                  return null;
-              }
-          }
-          return null;
-      }
+      
+      // Helper function to safely extract the JSON from the saved HTML
+      function getConfigFromHtml(html) {
+          // Use a temporary div to parse the HTML string
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = html;
+          
+          // Look for the element with the JSON config data-attribute
+          // NOTE: This selector targets the element created in saveContent()
+          const configElement = tempDiv.querySelector('[data-json-config]');
+          
+          if (configElement) {
+              // Get the string, and replace the escaped &quot; back to " for JSON.parse
+              const jsonString = configElement.getAttribute('data-json-config').replace(/&quot;/g, '"');
+              try {
+                  return JSON.parse(jsonString);
+              } catch (e) {
+                  console.error('Error parsing JSON from saved content:', e);
+                  return null;
+              }
+          }
+          return null;
+      }
 
 
       // 2. Define the saveContent function
       function saveContent() {
         var message = document.getElementById("customMessage").value;
-        
-        // **SAVE STEP A: Structure the data as JSON**
-        var config = {
-            messageText: message
-        };
-        var jsonString = JSON.stringify(config);
-        
-        // **SAVE STEP B: Create the AMPscript/HTML to be saved in the email**
-        // This includes the invisible div to hold the JSON and the rendering logic.
-        var renderedContent = 
-            // 1. Invisible div to store the JSON config
-            '<div data-json-config="' + jsonString + '" style="display:none;"></div>' +
-            
-            // 2. AMPscript to read the config and use it at send time
-            '%%[ ' +
-            'SET @configJson = AttributeValue("data-json-config") ' +
-            'SET @json = BuildRowsetFromJson(@configJson, "$", 1) ' +
-            'SET @message = Field(Row(@json, 1), "messageText") ' +
-            ']%%' +
-            
-            // 3. Visible email HTML using the AMPscript variable
-            '<p style="color: blue;">Your custom message: %%=v(@message)=%%</p>';
-            
+        
+        // **SAVE STEP A: Structure the data as JSON**
+        var config = {
+            messageText: message
+        };
+        
+        // 🔑 FIX 1: ESCAPE QUOTES FOR HTML ATTRIBUTE SAFETY
+        var jsonString = JSON.stringify(config).replace(/"/g, '&quot;');
+        
+        // **SAVE STEP B: Create the AMPscript/HTML to be saved in the email**
+        var renderedContent = 
+            // 1. Invisible div to store the JSON config (must be the root of the content)
+            '<div data-json-config="' + jsonString + '" style="display:none;"></div>' +
+            
+            // 2. AMPscript to read the config and use it at send time
+            // 💡 FIX 2: Added VAR declaration for best practice
+            '%%[ ' +
+            'VAR @configJson, @json, @message ' +
+            'SET @configJson = AttributeValue("data-json-config") ' +
+            'SET @json = BuildRowsetFromJson(@configJson, "$", 1) ' +
+            'SET @message = Field(Row(@json, 1), "messageText") ' +
+            ']%%' +
+            
+            // 3. Visible email HTML using the extracted message
+            '<p style="color: blue;">Your custom message: %%=v(@message)=%%</p>';
+            
         // **SAVE STEP C: Send the final rendered HTML to SFMC**
         sdk.setContent(renderedContent, function () {
           console.log("Content successfully saved!");
@@ -74,16 +79,16 @@
       // 3. **LOAD** existing content when the editor opens
       sdk.getContent(function (content) {
         if (content) {
-            // **LOAD STEP A: Extract the JSON from the saved HTML**
-            const config = getConfigFromHtml(content);
+            // **LOAD STEP A: Extract the JSON from the saved HTML**
+            const config = getConfigFromHtml(content);
 
-            if (config && config.messageText) {
-                // **LOAD STEP B: Put the extracted message back into the input field**
-                document.getElementById("customMessage").value = config.messageText;
-            } else {
-                // Handle cases where content exists but is not valid JSON config
-                console.warn('Content found, but no valid JSON configuration was extracted.');
-            }
+            if (config && config.messageText) {
+                // **LOAD STEP B: Put the extracted message back into the input field**
+                document.getElementById("customMessage").value = config.messageText;
+            } else {
+                // Handle cases where content exists but is not valid JSON config
+                console.warn('Content found, but no valid JSON configuration was extracted.');
+            }
         }
       });
 
