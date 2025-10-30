@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Custom Block Editor</title>
+    <script src="https://unpkg.com/@salesforce-marketingcloud/blocksdk@1.1.2/blocksdk.js"></script>
+  </head>
+  <body>
+    <h1>Custom Message Editor</h1>
+    <input
+      type="text"
+      id="customMessage"
+      placeholder="Enter your custom message"
+    />
+    <button id="saveButton">Save Content</button>
+
+    <script>
+      // 1. Initialize the SDK
+      var sdk = new window.sfdc.BlockSDK();
+
+      // 2. Define the saveContent function
+      function saveContent() {
+        var message = document.getElementById("customMessage").value;
+
+        // This is the raw HTML (AMPscript/SSJS) that gets saved to the block.
+        var renderedContent =
+          '<p style="color: blue;">Your message: ' + message + "</p>";
+
+        // Set the content back to the Content Builder block
+        sdk.setContent(renderedContent, function () {
+          console.log("Content successfully saved!");
+        });
+      }
+
+      // 3. Load existing content when the editor opens
+      sdk.getContent(function (content) {
+        if (content) {
+          document.getElementById("customMessage").value = content;
+        }
+      });
+
+      // 4. **Attach the Event Listener (The fix for "not defined")**
+      // This ensures the saveContent function is attached *after* it's been defined.
+      document
+        .getElementById("saveButton")
+        .addEventListener("click", saveContent);
+    </script>
+  </body>
+</html>
