@@ -99,28 +99,32 @@
         /**
          * Saves data via sdk.setData() and SSJS/AMPscript via sdk.setContent().
          */
-        function handleAssetSelection(asset) {
-            
-            const assetID = asset.id;
-            const imageURL = asset.url; 
-            let altText = asset.name || "Image"; 
-            
-            if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
-                const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
-                altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
-            }
+       /**
+ * Processes the data returned from the Bynder UCV and saves it to SFMC.
+ */
+function handleAssetSelection(asset) {
+    
+    const assetID = asset.id;
+    const imageURL = asset.url; 
+    let altText = asset.name || "Image"; 
+    
+    // Alt text extraction logic
+    if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
+        const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
+        altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
+    }
 
-            // --- A. CONFIGURATION DATA (for the editor to reload) ---
-            const editorConfig = {
-                assetID: assetID,
-                imageURL: imageURL,
-                altText: altText,
-                assetName: asset.name 
-            };
+    // --- 1. CONFIGURATION DATA (for the editor to reload) ---
+    const editorConfig = {
+        assetID: assetID,
+        imageURL: imageURL,
+        altText: altText,
+        assetName: asset.name 
+    };
 
-            // --- B. SERVER-SIDE RENDERING CONTENT (SSJS/AMPscript) ---
-            // This content is what gets saved to the block and executes at send time.
-            const finalImageHTML = `
+    // --- 2. SERVER-SIDE RENDERING CONTENT (SSJS/AMPscript) ---
+    // The entire block is enclosed in backticks (`)
+    const finalImageHTML = `
 %%[
 /* 1. Define AMPscript variables */
 VAR @imageURL, @altText, @jsonString, @error
@@ -130,6 +134,7 @@ VAR @imageURL, @altText, @jsonString, @error
     
     // 2. Retrieve the JSON configuration saved by sdk.setData()
     try {
+        // Injecting the JS constant into the saved string:
         var blockData = ContentBlockById('${BLOCK_EXTERNAL_KEY}').ContentBlockData;
         var jsonString = blockData.data; 
     } catch(e) {
@@ -166,21 +171,21 @@ ELSE
 %%[
 ENDIF
 ]%%
-`;
+`; // <-- Closing backtick for the entire SSR string
 
-            if (sdk) {
-                // 5. Save the Server-Side Rendering code block
-                sdk.setContent(finalImageHTML, function() {
-                    console.log("SSJS/AMPscript saved for SSR.");
-                });
-                
-                // 6. Save the clean JSON data for the editor to use later
-                sdk.setData(editorConfig, function() {
-                    console.log("Configuration JSON saved via sdk.setData().");
-                    updateEditorDisplay(editorConfig);
-                });
-            }
-        }
+    if (sdk) {
+        // 5. Save the Server-Side Rendering code block
+        sdk.setContent(finalImageHTML, function() {
+            console.log("SSJS/AMPscript saved for SSR.");
+        });
+        
+        // 6. Save the clean JSON data for the editor to use later
+        sdk.setData(editorConfig, function() {
+            console.log("Configuration JSON saved via sdk.setData().");
+            updateEditorDisplay(editorConfig);
+        });
+    }
+}
 
         /**
          * Updates the editor's UI fields with the latest data.
@@ -197,3 +202,4 @@ ENDIF
     </script>
 </body>
 </html>
+
