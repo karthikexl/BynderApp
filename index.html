@@ -8,23 +8,7 @@
     <script async src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-5-latest.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; padding: 20px; background-color: #f7f7f7; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        #bynder-btn {
-            background-color: #00A9E0; /* Bynder Blue */
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        #bynder-btn:hover { background-color: #008cc9; }
-        .asset-info { margin-top: 20px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px; }
-        .asset-info p { margin: 5px 0; font-size: 0.9em; }
-        .asset-info strong { color: #333; }
-        .placeholder { color: #999; }
+        /* ... (Your existing CSS here) ... */
     </style>
 </head>
 <body>
@@ -37,134 +21,95 @@
         <div class="asset-info">
             <p><strong>Selected Image:</strong> <span id="asset-name-display" class="placeholder">No asset selected.</span></p>
             <p><strong>Asset ID:</strong> <span id="asset-id-display" class="placeholder">N/A</span></p>
-            <p><strong>Alt Text:</strong> <span id="alt-text-display" class="placeholder">N/A</span></p>
+            <p><strong>Alt Text (Fallback):</strong> <span id="alt-text-display" class="placeholder">N/A</span></p>
         </div>
     </div>
 
     <script>
-        // 🔑 FIX 2: Use window.onload to ensure ALL external scripts (SFMC & Bynder) have run.
-        window.onload = function() {
+        // --- 0. Initialize SFMC SDK ---
+        // 🔑 FIX 2: Initialize the modern SDK object
+        var sdk;
+        try {
+            sdk = new window.sfdc.BlockSDK();
+        } catch(e) {
+            console.error("SFMC BlockSDK initialization failed.", e);
+            // Optionally disable the button if SDK fails
+            document.getElementById('bynder-btn').disabled = true;
+        }
+
+        // --- 2. Bynder Configuration (MUST BE UPDATED) ---
+        const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
+        const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
+
+        // --- 3. UCV Launch and Data Handling ---
+
+        document.getElementById('bynder-btn').addEventListener('click', function() {
+            if (typeof BynderCompactView === 'undefined') {
+                alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
+                return;
+            }
             
-            // --- 0. Initialize SFMC SDK ---
-            var sdk;
-            try {
-                sdk = new window.sfdc.BlockSDK();
-                console.log("SFMC BlockSDK initialized successfully.");
-            } catch(e) {
-                console.error("CRITICAL ERROR: window.sfdc or BlockSDK is undefined. The SDK script file is likely being blocked from loading.", e);
-                document.getElementById('bynder-btn').disabled = true;
-                return; // Stop execution if SDK is not ready
+            // NOTE: You must also ensure BynderCompactView is configured with your Portal URL!
+            // This is often done globally, but ensure your implementation supports the portal
+            // or pass it in the options if required by your Bynder integration.
+            
+            BynderCompactView.open({
+                // ... (Your existing UCV options) ...
+                onSuccess: function(assets, additionalInfo) {
+                    if (assets && assets.length > 0) {
+                        handleAssetSelection(assets[0]);
+                    }
+                },
+                // ... (Your existing onClose) ...
+            });
+        });
+
+
+        /**
+         * Processes the data returned from the Bynder UCV and sends the FINAL HTML to SFMC.
+         * @param {Object} asset - The single asset object returned by Bynder.
+         */
+        function handleAssetSelection(asset) {
+            
+            // ... (Your existing data extraction logic) ...
+
+            const assetID = asset.id;
+            const imageURL = asset.url;
+            
+            let altText = asset.name || "Default Image Alt Text"; 
+            
+            if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
+                const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
+                altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
             }
 
-            // --- 2. Bynder Configuration (MUST BE UPDATED) ---
-            const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
-            const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
+            // Update the UI for the marketer
+            document.getElementById('asset-name-display').textContent = asset.name;
+            document.getElementById('asset-id-display').textContent = assetID;
+            document.getElementById('alt-text-display').textContent = altText;
+            document.getElementById('alt-text-display').classList.remove('placeholder');
 
-            // --- 3. UCV Launch and Data Handling ---
-
-            document.getElementById('bynder-btn').addEventListener('click', function() {
-                if (typeof BynderCompactView === 'undefined') {
-                    alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
-                    return;
-                }
-                
-                BynderCompactView.open({
-                    language: "en_US",
-                    theme: {
-                        colorButtonPrimary: "#3380FF"
-                    },
-                    mode: "SingleSelectFile",
-                    
-                    onSuccess: function(assets, additionalInfo) {
-                        if (assets && assets.length > 0) {
-                            handleAssetSelection(assets[0]);
-                        }
-                    },
-                    
-                    onClose: function() {
-                        console.log('Bynder UCV closed.');
-                    }
-                });
-            });
-
-
-            /**
-             * Processes the data returned from the Bynder UCV and saves it to SFMC.
-             */
-            function handleAssetSelection(asset) {
-                
-                const assetID = asset.id;
-                // NOTE: Use Bynder's derivative URL here for responsive sizing in production
-                const imageURL = asset.url; 
-                let altText = asset.name || "Image"; 
-                
-                if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
-                    const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
-                    altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
-                }
-
-                // --- 1. CONFIGURATION DATA (for the editor to reload) ---
-                const editorConfig = {
-                    assetID: assetID,
-                    imageURL: imageURL,
-                    altText: altText,
-                    assetName: asset.name // Save for cleaner display
-                };
-
-                // --- 2. SFMC CONTENT SAVE FUNCTION ---
-                
-                // CRITICAL: Ensure image has proper email styling for responsiveness
+            // --- SFMC CONTENT SAVE FUNCTION ---
+            if (sdk) {
+                // 🔑 FIX 3: Generate the final HTML/AMPscript using the extracted data
                 const finalImageHTML = `
                     <img src="${imageURL}" 
                          alt="${altText}" 
-                         width="600" 
+                         width="100%" 
                          style="display:block; max-width:100%; height:auto;" 
                          border="0" />
                     `;
 
-                if (sdk) {
-                    // 2a. Save the final HTML for email rendering
-                    sdk.setContent(finalImageHTML, function() {
-                        console.log("Image HTML saved to block content.");
-                    });
-                    
-                    // 2b. Save the clean JSON data for the editor to use later
-                    sdk.setData(editorConfig, function() {
-                        console.log("Configuration JSON saved via sdk.setData().");
-                        
-                        // Update the UI *after* successful saves
-                        updateEditorDisplay(editorConfig);
-                    });
-                }
-            }
-
-            /**
-             * Updates the editor's UI fields with the latest data.
-             */
-            function updateEditorDisplay(data) {
-                document.getElementById('asset-name-display').textContent = data.assetName || data.assetID;
-                document.getElementById('asset-id-display').textContent = data.assetID;
-                document.getElementById('alt-text-display').textContent = data.altText;
-                
-                document.getElementById('asset-name-display').classList.remove('placeholder');
-                document.getElementById('asset-id-display').classList.remove('placeholder');
-                document.getElementById('alt-text-display').classList.remove('placeholder');
-            }
-
-
-            // --- 4. LOAD existing configuration when the editor opens ---
-            if (sdk) {
-                sdk.getData(function (data) {
-                    if (data && data.assetID) {
-                        console.log("Existing configuration loaded:", data);
-                        // Populate the display fields with saved data
-                        updateEditorDisplay(data);
-                    } else {
-                        console.log("No previous configuration data found. Starting fresh.");
-                    }
+                // Use the modern SDK function to save the final HTML to the block
+                sdk.setContent(finalImageHTML, function() {
+                    console.log("Bynder Image HTML successfully saved to SFMC Content Block.");
+                    // You may also want to use sdk.setData() to save the config JSON for load
+                    // sdk.setData({ imageURL: imageURL, altText: altText }, function() { ... });
                 });
+            } else {
+                console.error("SFMC SDK not initialized. Cannot save content.");
             }
-        }; // End of window.onload
+        }
     </script>
 </body>
 </html>
