@@ -2,30 +2,13 @@
 <html>
 <head>
     <title>Bynder Asset Selector</title>
-   
     
-    <!-- 1. Include the Bynder Universal Compact View (UCV) Loader Script -->
-    <!-- This script provides the global 'BynderCompactView' object -->
+    <script src="https://salesforce-marketingcloud.github.io/blocksdk/dist/blocksdk.min.js"></script>
+    
     <script async src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-5-latest.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; padding: 20px; background-color: #f7f7f7; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        #bynder-btn {
-            background-color: #00A9E0; /* Bynder Blue */
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        #bynder-btn:hover { background-color: #008cc9; }
-        .asset-info { margin-top: 20px; padding: 10px; border: 1px dashed #ccc; border-radius: 4px; }
-        .asset-info p { margin: 5px 0; font-size: 0.9em; }
-        .asset-info strong { color: #333; }
-        .placeholder { color: #999; }
+        /* ... (Your existing CSS here) ... */
     </style>
 </head>
 <body>
@@ -43,67 +26,59 @@
     </div>
 
     <script>
+        // --- 0. Initialize SFMC SDK ---
+        // 🔑 FIX 2: Initialize the modern SDK object
+        var sdk;
+        try {
+            sdk = new window.sfdc.BlockSDK();
+        } catch(e) {
+            console.error("SFMC BlockSDK initialization failed.", e);
+            // Optionally disable the button if SDK fails
+            document.getElementById('bynder-btn').disabled = true;
+        }
+
         // --- 2. Bynder Configuration (MUST BE UPDATED) ---
-        // Replace with your actual Bynder Portal URL (without trailing slash)
         const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com.bynder.com'; 
-        
-        // IMPORTANT: Identify the metaproperty name/ID for Alt Text in your Bynder setup
-        // Common placeholders: 'alt_text', 'description', or a UUID
         const ALT_TEXT_METAPROPERTY_KEY = 'alt_text'; 
 
         // --- 3. UCV Launch and Data Handling ---
 
         document.getElementById('bynder-btn').addEventListener('click', function() {
-            // Check if the BynderCompactView is loaded
             if (typeof BynderCompactView === 'undefined') {
                 alert('Bynder UCV is not yet loaded. Please wait a moment and try again.');
                 return;
             }
             
+            // NOTE: You must also ensure BynderCompactView is configured with your Portal URL!
+            // This is often done globally, but ensure your implementation supports the portal
+            // or pass it in the options if required by your Bynder integration.
+            
             BynderCompactView.open({
-                language: "en_US",
-                theme: {
-          colorButtonPrimary: "#3380FF"
-        },
-           
-                mode: "SingleSelectFile",
-                
-                // The function that runs when the user selects an asset
+                // ... (Your existing UCV options) ...
                 onSuccess: function(assets, additionalInfo) {
-
-       var asset = assets[0];
-
-          console.log(asset, additionalInfo);
                     if (assets && assets.length > 0) {
-console.log('Handle asset called.');
-
-                        handleAssetSelection(asset);
+                        handleAssetSelection(assets[0]);
                     }
                 },
-                
-                // Optional: Handle when the user closes the UCV without selecting
-                onClose: function() {
-                    console.log('Bynder UCV closed.');
-                }
+                // ... (Your existing onClose) ...
             });
         });
 
 
         /**
-         * Processes the data returned from the Bynder UCV and sends it to SFMC Content Builder.
+         * Processes the data returned from the Bynder UCV and sends the FINAL HTML to SFMC.
          * @param {Object} asset - The single asset object returned by Bynder.
          */
         function handleAssetSelection(asset) {
             
+            // ... (Your existing data extraction logic) ...
+
             const assetID = asset.id;
-            const imageURL = asset.url; // The main public image URL
+            const imageURL = asset.url;
             
-            // Attempt to pull the Alt Text from the specific metaproperty
-            let altText = asset.name || "Default Image Alt Text"; // Fallback to asset name
+            let altText = asset.name || "Default Image Alt Text"; 
             
-            // Check the metaproperties for the specific alt text field
             if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
-                // Assuming it's a single value (can be an array for multi-select)
                 const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
                 altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
             }
@@ -114,22 +89,25 @@ console.log('Handle asset called.');
             document.getElementById('alt-text-display').textContent = altText;
             document.getElementById('alt-text-display').classList.remove('placeholder');
 
-            // --- SFMC Content Block SDK Function ---
-            // Pass the data that will be used as placeholders in view.html
-            const viewData = {
-                // These keys MUST match the placeholders (e.g., {{assetID}}) in your view.html
-                assetID: assetID, 
-                imageURL: imageURL, 
-                // We pass the captured Alt Text as a fallback value for display
-                altTextFallback: altText 
-            };
+            // --- SFMC CONTENT SAVE FUNCTION ---
+            if (sdk) {
+                // 🔑 FIX 3: Generate the final HTML/AMPscript using the extracted data
+                const finalImageHTML = `
+                    <img src="${imageURL}" 
+                         alt="${altText}" 
+                         width="100%" 
+                         style="display:block; max-width:100%; height:auto;" 
+                         border="0" />
+                    `;
 
-            // This function tells Content Builder to update the final HTML (view.html)
-            // It replaces the placeholders in view.html with the data values above.
-            if (typeof sfmc !== 'undefined' && sfmc.postData) {
-                 sfmc.postData(viewData); 
+                // Use the modern SDK function to save the final HTML to the block
+                sdk.setContent(finalImageHTML, function() {
+                    console.log("Bynder Image HTML successfully saved to SFMC Content Block.");
+                    // You may also want to use sdk.setData() to save the config JSON for load
+                    // sdk.setData({ imageURL: imageURL, altText: altText }, function() { ... });
+                });
             } else {
-                console.error("SFMC SDK not available. Could not post data.");
+                console.error("SFMC SDK not initialized. Cannot save content.");
             }
         }
     </script>
