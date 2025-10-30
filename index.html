@@ -110,6 +110,7 @@
                     altText: altText,
                     assetName: asset.name // Save for cleaner display
                 };
+                  console.log("Handle initialized successfully.");
 
                 // --- 2. SFMC CONTENT SAVE FUNCTION ---
                 
@@ -123,6 +124,7 @@
                     `;
 
                 if (sdk) {
+                      console.log("SFMC BlockSDK Set content successfully.");
                     // 2a. Save the final HTML for email rendering
                     sdk.setContent(finalImageHTML, function() {
                         console.log("Image HTML saved to block content.");
