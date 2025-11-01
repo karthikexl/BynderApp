@@ -96,7 +96,7 @@
                 
                 const assetID = asset.id;
                 // NOTE: Use Bynder's derivative URL here for responsive sizing in production
-                const imageURL = asset.url; 
+                const imageURL = asset.originalUrl; 
                 let altText = asset.name || "Image"; 
                 
                 if (asset.metaproperties && asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY]) {
@@ -113,7 +113,7 @@
              * Updates the editor's UI fields with the latest data.
              */
             function updateEditorDisplay(asset) {
-                document.getElementById('asset-name-display').textContent = asset.url;
+                document.getElementById('asset-name-display').textContent = asset.originalUrl;
                 document.getElementById('asset-id-display').textContent = asset.id;
                 document.getElementById('alt-text-display').textContent = asset.name;
                 
@@ -139,6 +139,7 @@
     </script>
 </body>
 </html>
+
 
 
 
