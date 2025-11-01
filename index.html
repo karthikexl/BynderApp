@@ -52,13 +52,6 @@
             // --- 0. Initialize SFMC SDK with Tabs Configuration (PRODUCTION LOGIC) ---
             var sdk;
             
-            // ⚠️ CRITICAL CHECK: Ensure the required SFMC objects exist
-            if (typeof window.sfdc === 'undefined' || typeof window.sfdc.BlockSDK !== 'function') {
-                console.error("CRITICAL ERROR: SFMC BlockSDK is unavailable. This block requires the SFMC Content Builder environment.");
-                document.getElementById('bynder-btn').disabled = true;
-                return; // HALT execution if not in SFMC
-            }
-            
             try {
                 // Initialize the REAL SFMC Block SDK
                 sdk = new window.sfdc.BlockSDK({
@@ -206,3 +199,4 @@
     </script>
 </body>
 </html>
+
