@@ -49,29 +49,37 @@
         
         window.onload = function() {
             
-            // --- 0. Initialize SFMC SDK with Tabs Configuration ---
+            // --- 0. Initialize SFMC SDK with Tabs Configuration (Robust Check) ---
             var sdk;
-            try {
-                // Initialize the SFMC Block SDK and configure the tabs
-                sdk = new window.sfdc.BlockSDK({
-                    // Set the initial width of the editor panel (optional)
-                    blockEditorWidth: 450, 
-                    tabs: [
-                        { 
-                            // The first tab should link back to this editor interface
-                            key: 'design', 
-                            url: window.location.href, 
-                            name: 'Bynder Asset' 
-                        }, 
-                        'htmlblock',    // Includes the HTML Source Tab
-                        'stylingblock'  // Includes the Block Settings (Styling) Tab
-                    ]
-                }); 
-                console.log("SFMC BlockSDK initialized successfully with tabs.");
-            } catch(e) {
-                // If window.sfdc is undefined, this is likely not running inside SFMC.
-                console.error("CRITICAL ERROR: window.sfdc.BlockSDK is undefined. Ensure this is running inside SFMC Content Builder.", e);
-                // Fail gracefully if SDK isn't available
+            
+            // Check for window.sfdc and window.sfdc.BlockSDK explicitly to prevent TypeError 
+            if (typeof window.sfdc !== 'undefined' && typeof window.sfdc.BlockSDK === 'function') {
+                try {
+                    // Initialize the SFMC Block SDK and configure the tabs
+                    sdk = new window.sfdc.BlockSDK({
+                        // Set the initial width of the editor panel (optional)
+                        blockEditorWidth: 450, 
+                        tabs: [
+                            { 
+                                // The first tab should link back to this editor interface
+                                key: 'design', 
+                                url: window.location.href, 
+                                name: 'Bynder Asset' 
+                            }, 
+                            'htmlblock',    // Includes the HTML Source Tab
+                            'stylingblock'  // Includes the Block Settings (Styling) Tab
+                        ]
+                    }); 
+                    console.log("SFMC BlockSDK initialized successfully with tabs.");
+                } catch(e) {
+                    // This catches unexpected issues during the constructor call itself
+                    console.error("SFMC BlockSDK initialization failed unexpectedly during constructor call.", e);
+                    document.getElementById('bynder-btn').disabled = true;
+                    return;
+                }
+            } else {
+                // This handles the primary error condition reported by the user
+                console.error("CRITICAL ERROR: window.sfdc.BlockSDK is unavailable. Ensure this is running inside SFMC Content Builder.");
                 document.getElementById('bynder-btn').disabled = true;
                 return;
             }
@@ -180,6 +188,7 @@
 
 
             // --- 4. LOAD existing configuration when the editor opens ---
+            // This relies on 'sdk' being defined, which is ensured by the robust check above.
             if (sdk) {
                 sdk.getData(function (data) {
                     if (data && data.assetID) {
