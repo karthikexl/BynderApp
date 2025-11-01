@@ -3,9 +3,6 @@
 <head>
     <title>Bynder Asset Selector</title>
     
-    <!-- ⚠️ NOTE: The official SFMC BlockSDK is provided by the parent window (window.sfdc.BlockSDK). 
-         We are REMOVING the local 'blocksdk.js' script to prevent ReferenceErrors and ensure proper loading. -->
-    
     <!-- External Script for Bynder Compact View (UCV) -->
     <script async src="https://ucv.bynder.com/5.0.5/modules/compactview/bynder-compactview-5-latest.js"></script>
 
@@ -52,22 +49,28 @@
         
         window.onload = function() {
             
-            // --- 0. Initialize SFMC SDK ---
+            // --- 0. Initialize SFMC SDK with Tabs Configuration ---
             var sdk;
             try {
-                // The correct way to initialize the SFMC Block SDK
-                sdk = new window.sfdc.BlockSDK(); 
-                this.sdk = new BlockSDK({
-           blockEditorWidth: 600,
-           tabs: [
-               { key: 'design', url: `${window.location.origin}/block/design/`, name: 'Design' }, // This is a custom tab
-               'htmlblock', // This is the HTML Editor Tab
-               'stylingblock' // This is the styling tab
-           ]
-       });
-                console.log("SFMC BlockSDK initialized successfully.");
+                // Initialize the SFMC Block SDK and configure the tabs
+                sdk = new window.sfdc.BlockSDK({
+                    // Set the initial width of the editor panel (optional)
+                    blockEditorWidth: 450, 
+                    tabs: [
+                        { 
+                            // The first tab should link back to this editor interface
+                            key: 'design', 
+                            url: window.location.href, 
+                            name: 'Bynder Asset' 
+                        }, 
+                        'htmlblock',    // Includes the HTML Source Tab
+                        'stylingblock'  // Includes the Block Settings (Styling) Tab
+                    ]
+                }); 
+                console.log("SFMC BlockSDK initialized successfully with tabs.");
             } catch(e) {
-                console.error("CRITICAL ERROR: window.sfdc or BlockSDK is undefined. Ensure this is running inside SFMC Content Builder.", e);
+                // If window.sfdc is undefined, this is likely not running inside SFMC.
+                console.error("CRITICAL ERROR: window.sfdc.BlockSDK is undefined. Ensure this is running inside SFMC Content Builder.", e);
                 // Fail gracefully if SDK isn't available
                 document.getElementById('bynder-btn').disabled = true;
                 return;
@@ -195,5 +198,3 @@
     </script>
 </body>
 </html>
-
-
