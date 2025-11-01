@@ -49,72 +49,38 @@
         
         window.onload = function() {
             
-            // --- 0. Initialize SFMC SDK with Tabs Configuration (Robust Check & Mock) ---
+            // --- 0. Initialize SFMC SDK with Tabs Configuration (PRODUCTION LOGIC) ---
             var sdk;
             
-            // Check for window.sfdc and window.sfdc.BlockSDK explicitly
-            if (typeof window.sfdc !== 'undefined' && typeof window.sfdc.BlockSDK === 'function') {
-                try {
-                    // Initialize the REAL SFMC Block SDK
-                    sdk = new window.sfdc.BlockSDK({
-                        blockEditorWidth: 450, 
-                        tabs: [
-                            { 
-                                key: 'design', 
-                                url: window.location.href, 
-                                name: 'Bynder Asset' 
-                            }, 
-                            'htmlblock',    
-                            'stylingblock'  
-                        ]
-                    }); 
-                    console.log("SFMC BlockSDK initialized successfully with tabs.");
-                } catch(e) {
-                    console.error("SFMC BlockSDK initialization failed unexpectedly during constructor call.", e);
-                    document.getElementById('bynder-btn').disabled = true;
-                    return;
-                }
-            } else {
-                // === MOCK SDK FOR DEVELOPMENT/TESTING ===
-                console.warn("WARNING: Running in development mode. SFMC BlockSDK is unavailable. Using mock SDK.");
-                
-                // Define a basic mock SDK class to prevent runtime errors
-                class MockBlockSDK {
-                    constructor(config) {
-                        this.config = config;
-                        // Initialize internal data structure for mock persistence
-                        this.internalData = JSON.parse(localStorage.getItem('mockBlockData') || '{}'); 
-                        console.log("Mock SDK created. Initial data:", this.internalData);
-                    }
-                    setData(data) {
-                        // Persist data to localStorage in the mock
-                        this.internalData = data;
-                        localStorage.setItem('mockBlockData', JSON.stringify(data));
-                        console.log("Mock setData called and persisted to localStorage:", data);
-                    }
-                    setContent(content) {
-                        // In a real environment, this updates the email content. Here, we just log it.
-                        console.log("Mock setContent called. Generated HTML content:", content);
-                    }
-                    getData(callback) {
-                        // Simulate asynchronous data retrieval
-                        setTimeout(() => callback(this.internalData), 10);
-                    }
-                }
-
-                // Initialize the Mock SDK with the required tabs config
-                sdk = new MockBlockSDK({
+            // ⚠️ CRITICAL CHECK: Ensure the required SFMC objects exist
+            if (typeof window.sfdc === 'undefined' || typeof window.sfdc.BlockSDK !== 'function') {
+                console.error("CRITICAL ERROR: SFMC BlockSDK is unavailable. This block requires the SFMC Content Builder environment.");
+                document.getElementById('bynder-btn').disabled = true;
+                return; // HALT execution if not in SFMC
+            }
+            
+            try {
+                // Initialize the REAL SFMC Block SDK
+                sdk = new window.sfdc.BlockSDK({
                     blockEditorWidth: 450, 
                     tabs: [
-                        { key: 'design', url: window.location.href, name: 'Bynder Asset' }, 
+                        { 
+                            key: 'design', 
+                            // Using window.location.href ensures the tab points to the current editor URL
+                            url: window.location.href, 
+                            name: 'Bynder Asset' 
+                        }, 
                         'htmlblock',    
                         'stylingblock'  
                     ]
-                });
-                // The button should remain enabled for testing the Bynder flow in this environment
-                document.getElementById('bynder-btn').disabled = false;
-                // END MOCK SDK
+                }); 
+                console.log("SFMC BlockSDK initialized successfully with tabs.");
+            } catch(e) {
+                console.error("SFMC BlockSDK initialization failed unexpectedly during constructor call.", e);
+                document.getElementById('bynder-btn').disabled = true;
+                return;
             }
+
 
             // --- 2. Bynder Configuration (Must be updated with correct URL) ---
             const BYNDER_PORTAL_URL = 'https://accenture-in-global-reseller.bynder.com'; // CHECK THIS URL!
@@ -126,7 +92,6 @@
 
             document.getElementById('bynder-btn').addEventListener('click', function() {
                 if (typeof BynderCompactView === 'undefined') {
-                    // Use console.error instead of alert()
                     console.error('Bynder UCV is not yet loaded. Please wait a moment and try again.');
                     return;
                 }
@@ -141,7 +106,6 @@
                     
                     onSuccess: function(assets, additionalInfo) {
                         if (assets && assets.length > 0) {
-                            // Process the selected Bynder asset
                             handleAssetSelection(assets[0]); 
                         }
                     },
@@ -154,10 +118,8 @@
 
             // Listener for Alt Text input changes
             document.getElementById('alt-text-input').addEventListener('input', function(event) {
-                // Check if SDK is available and if data is set (which should be true in the mock scenario)
                 if (sdk && savedData && savedData.assetID) { 
                     savedData.altText = event.target.value;
-                    // Persist data and re-render HTML for SFMC
                     saveAndUpdateSFMC();
                 }
             });
