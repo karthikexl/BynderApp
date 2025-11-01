@@ -54,19 +54,8 @@
             
             try {
                 // Initialize the REAL SFMC Block SDK
-                sdk = new window.sfdc.BlockSDK({
-                    blockEditorWidth: 450, 
-                    tabs: [
-                        { 
-                            key: 'design', 
-                            // Using window.location.href ensures the tab points to the current editor URL
-                            url: window.location.href, 
-                            name: 'Bynder Asset' 
-                        }, 
-                        'htmlblock',    
-                        'stylingblock'  
-                    ]
-                }); 
+            sdk = new window.sfdc.BlockSDK({
+                     tabs: ['stylingblock', 'htmlblock']});
                 console.log("SFMC BlockSDK initialized successfully with tabs.");
             } catch(e) {
                 console.error("SFMC BlockSDK initialization failed unexpectedly during constructor call.", e);
@@ -199,4 +188,5 @@
     </script>
 </body>
 </html>
+
 
