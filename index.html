@@ -49,39 +49,71 @@
         
         window.onload = function() {
             
-            // --- 0. Initialize SFMC SDK with Tabs Configuration (Robust Check) ---
+            // --- 0. Initialize SFMC SDK with Tabs Configuration (Robust Check & Mock) ---
             var sdk;
             
-            // Check for window.sfdc and window.sfdc.BlockSDK explicitly to prevent TypeError 
+            // Check for window.sfdc and window.sfdc.BlockSDK explicitly
             if (typeof window.sfdc !== 'undefined' && typeof window.sfdc.BlockSDK === 'function') {
                 try {
-                    // Initialize the SFMC Block SDK and configure the tabs
+                    // Initialize the REAL SFMC Block SDK
                     sdk = new window.sfdc.BlockSDK({
-                        // Set the initial width of the editor panel (optional)
                         blockEditorWidth: 450, 
                         tabs: [
                             { 
-                                // The first tab should link back to this editor interface
                                 key: 'design', 
                                 url: window.location.href, 
                                 name: 'Bynder Asset' 
                             }, 
-                            'htmlblock',    // Includes the HTML Source Tab
-                            'stylingblock'  // Includes the Block Settings (Styling) Tab
+                            'htmlblock',    
+                            'stylingblock'  
                         ]
                     }); 
                     console.log("SFMC BlockSDK initialized successfully with tabs.");
                 } catch(e) {
-                    // This catches unexpected issues during the constructor call itself
                     console.error("SFMC BlockSDK initialization failed unexpectedly during constructor call.", e);
                     document.getElementById('bynder-btn').disabled = true;
                     return;
                 }
             } else {
-                // This handles the primary error condition reported by the user
-                console.error("CRITICAL ERROR: window.sfdc.BlockSDK is unavailable. Ensure this is running inside SFMC Content Builder.");
-                document.getElementById('bynder-btn').disabled = true;
-                return;
+                // === MOCK SDK FOR DEVELOPMENT/TESTING ===
+                console.warn("WARNING: Running in development mode. SFMC BlockSDK is unavailable. Using mock SDK.");
+                
+                // Define a basic mock SDK class to prevent runtime errors
+                class MockBlockSDK {
+                    constructor(config) {
+                        this.config = config;
+                        // Initialize internal data structure for mock persistence
+                        this.internalData = JSON.parse(localStorage.getItem('mockBlockData') || '{}'); 
+                        console.log("Mock SDK created. Initial data:", this.internalData);
+                    }
+                    setData(data) {
+                        // Persist data to localStorage in the mock
+                        this.internalData = data;
+                        localStorage.setItem('mockBlockData', JSON.stringify(data));
+                        console.log("Mock setData called and persisted to localStorage:", data);
+                    }
+                    setContent(content) {
+                        // In a real environment, this updates the email content. Here, we just log it.
+                        console.log("Mock setContent called. Generated HTML content:", content);
+                    }
+                    getData(callback) {
+                        // Simulate asynchronous data retrieval
+                        setTimeout(() => callback(this.internalData), 10);
+                    }
+                }
+
+                // Initialize the Mock SDK with the required tabs config
+                sdk = new MockBlockSDK({
+                    blockEditorWidth: 450, 
+                    tabs: [
+                        { key: 'design', url: window.location.href, name: 'Bynder Asset' }, 
+                        'htmlblock',    
+                        'stylingblock'  
+                    ]
+                });
+                // The button should remain enabled for testing the Bynder flow in this environment
+                document.getElementById('bynder-btn').disabled = false;
+                // END MOCK SDK
             }
 
             // --- 2. Bynder Configuration (Must be updated with correct URL) ---
@@ -122,7 +154,8 @@
 
             // Listener for Alt Text input changes
             document.getElementById('alt-text-input').addEventListener('input', function(event) {
-                if (savedData && savedData.assetID) {
+                // Check if SDK is available and if data is set (which should be true in the mock scenario)
+                if (sdk && savedData && savedData.assetID) { 
                     savedData.altText = event.target.value;
                     // Persist data and re-render HTML for SFMC
                     saveAndUpdateSFMC();
@@ -161,6 +194,11 @@
              * Persists data using sdk.setData() and renders HTML using sdk.setContent().
              */
             function saveAndUpdateSFMC() {
+                if (!sdk) {
+                    console.error("SDK is not initialized. Cannot save or update content.");
+                    return;
+                }
+                
                 // Generate the final HTML for the email content
                 const finalImageHTML = '<a href="' + savedData.imageURL + '"><img src="' + savedData.imageURL + '" alt="' + savedData.altText + '" style="width:100%; max-width:600px; display:block;" /></a>';
                 
@@ -188,7 +226,6 @@
 
 
             // --- 4. LOAD existing configuration when the editor opens ---
-            // This relies on 'sdk' being defined, which is ensured by the robust check above.
             if (sdk) {
                 sdk.getData(function (data) {
                     if (data && data.assetID) {
