@@ -57,6 +57,14 @@
             try {
                 // The correct way to initialize the SFMC Block SDK
                 sdk = new window.sfdc.BlockSDK(); 
+                this.sdk = new BlockSDK({
+           blockEditorWidth: 600,
+           tabs: [
+               { key: 'design', url: `${window.location.origin}/block/design/`, name: 'Design' }, // This is a custom tab
+               'htmlblock', // This is the HTML Editor Tab
+               'stylingblock' // This is the styling tab
+           ]
+       }
                 console.log("SFMC BlockSDK initialized successfully.");
             } catch(e) {
                 console.error("CRITICAL ERROR: window.sfdc or BlockSDK is undefined. Ensure this is running inside SFMC Content Builder.", e);
@@ -187,3 +195,4 @@
     </script>
 </body>
 </html>
+
