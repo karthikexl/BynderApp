@@ -78,6 +78,7 @@
                     onSuccess: function(assets, additionalInfo) {
                         if (assets && assets.length > 0) {
                             handleAssetSelection(assets[0]);
+                            updateEditorDisplay(assets[0])
                         }
                     },
                     
@@ -102,45 +103,19 @@
                     const metaValue = asset.metaproperties[ALT_TEXT_METAPROPERTY_KEY];
                     altText = Array.isArray(metaValue) ? metaValue[0] : metaValue;
                 }
-
-                // --- 1. CONFIGURATION DATA (for the editor to reload) ---
-                const editorConfig = {
-                    assetID: assetID,
-                    imageURL: imageURL,
-                    altText: altText,
-                    assetName: asset.name // Save for cleaner display
-                };
-                  console.log("SFMC BlockSDK initialized successfully.");
-
-                // --- 2. SFMC CONTENT SAVE FUNCTION ---
-                
-                // CRITICAL: Ensure image has proper email styling for responsiveness
+                console.log("SFMC BlockSDK initialized successfully.");
                 const finalImageHTML ='<a href="' + imageURL + '"><img src="' + imageURL + '" /></a>';
-
-                if (sdk) {
-                      console.log("SFMC BlockSDK Set content successfully.");
-                    // 2a. Save the final HTML for email rendering
-                    sdk.setContent(finalImageHTML, function() {
-                        console.log("Image HTML saved to block content.");
-                    });
-                    
-                    // 2b. Save the clean JSON data for the editor to use later
-                    sdk.setData(editorConfig, function() {
-                        console.log("Configuration JSON saved via sdk.setData().");
-                        
-                        // Update the UI *after* successful saves
-                        updateEditorDisplay(editorConfig);
-                    });
-                }
+                sdk.setContent('<a href="' + imageURL + '"><img src="' + imageURL + '" /></a>');
+                console.log("SFMC BlockSDK content set successfully.");
             }
 
             /**
              * Updates the editor's UI fields with the latest data.
              */
-            function updateEditorDisplay(data) {
-                document.getElementById('asset-name-display').textContent = data.assetName || data.assetID;
-                document.getElementById('asset-id-display').textContent = data.assetID;
-                document.getElementById('alt-text-display').textContent = data.altText;
+            function updateEditorDisplay(asset) {
+                document.getElementById('asset-name-display').textContent = asset.url;
+                document.getElementById('asset-id-display').textContent = asset.id;
+                document.getElementById('alt-text-display').textContent = asset.name;
                 
                 document.getElementById('asset-name-display').classList.remove('placeholder');
                 document.getElementById('asset-id-display').classList.remove('placeholder');
@@ -164,4 +139,5 @@
     </script>
 </body>
 </html>
+
 
