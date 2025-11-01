@@ -115,9 +115,7 @@
                 // --- 2. SFMC CONTENT SAVE FUNCTION ---
                 
                 // CRITICAL: Ensure image has proper email styling for responsiveness
-                const finalImageHTML = `
-                    <table width="100%" cellspacing="0" cellpadding="0"><tr><td style=""><img height="797" width="800" src="${imageURL}" alt="${altText}"></td></tr></table>
-                    `;
+                const finalImageHTML ='<a href="' + imageURL + '"><img src="' + imageURL + '" /></a>';
 
                 if (sdk) {
                       console.log("SFMC BlockSDK Set content successfully.");
@@ -166,3 +164,4 @@
     </script>
 </body>
 </html>
+
